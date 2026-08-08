@@ -1,21 +1,21 @@
 # Fitness Authority Coach Voice App
 
-A lightweight inline voice interface for The Fitness Authority Coach, powered by ElevenLabs Agents.
+Inline voice interface for The Fitness Authority Coach, powered by ElevenLabs Agents.
+
+## What's new in v1.1
+
+After a coaching session ends, the user can download a plain-text transcript of the conversation. The transcript includes both the user's transcribed speech and the Fitness Authority Coach's responses.
+
+The transcript is captured in the browser from ElevenLabs conversation message events and is downloaded locally as a `.txt` file. No API key is exposed in the browser.
 
 ## Agent ID
 `agent_0101kzh93spaer0acy9nef2agqm4`
 
-## Brand asset
-The production interface uses `/public/fac-logo.png`.
-
 ## Vercel
-Import this GitHub repository into Vercel. Vercel should detect Vite automatically.
+This repository is connected to Vercel. Committing updated files should trigger an automatic redeployment of the existing app URL.
 
-- Build command: `npm run build`
-- Output directory: `dist`
-
-## GoHighLevel iframe
-After deployment, add this in a GHL Custom HTML element:
+## GoHighLevel
+The existing iframe URL does not need to change.
 
 ```html
 <iframe
@@ -27,3 +27,5 @@ After deployment, add this in a GHL Custom HTML element:
   loading="lazy"
 ></iframe>
 ```
+
+If the post-session controls feel cramped inside the iframe, increase the iframe height slightly.
