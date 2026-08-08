@@ -59,8 +59,12 @@ function VoiceCoach() {
   return (
     <main className="shell">
       <section className="coach-card" aria-label="The Fitness Authority Coach voice session">
-        <div className="mark" aria-hidden="true">FAC</div>
-        <div className="eyebrow">THE FITNESS AUTHORITY COACH</div>
+        <img
+          src="/fac-logo.png"
+          alt="The Fitness Authority Coach"
+          className="fac-logo"
+        />
+
         <h1>Ready to work through something?</h1>
         <p className="intro">
           Start a focused voice coaching session. Work through one issue at a time

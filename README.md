@@ -5,6 +5,9 @@ A lightweight inline voice interface for The Fitness Authority Coach, powered by
 ## Agent ID
 `agent_0101kzh93spaer0acy9nef2agqm4`
 
+## Brand asset
+The production interface uses `/public/fac-logo.png`.
+
 ## Vercel
 Import this GitHub repository into Vercel. Vercel should detect Vite automatically.
 
@@ -16,7 +19,7 @@ After deployment, add this in a GHL Custom HTML element:
 
 ```html
 <iframe
-  src="https://YOUR-VERCEL-URL.vercel.app"
+  src="https://fitness-authority-coach-voice.vercel.app/"
   width="100%"
   height="520"
   style="border:0; width:100%;"
@@ -24,6 +27,3 @@ After deployment, add this in a GHL Custom HTML element:
   loading="lazy"
 ></iframe>
 ```
-
-## ElevenLabs
-Direct Agent ID connections require the ElevenLabs agent to be public / have authentication disabled. If you later enable authentication, use a server-generated conversation token.
