@@ -100,19 +100,20 @@ h1 {
 
 .primary-button,
 .download-button {
-  width: min(100%, 370px);
+  width: min(100%, 390px);
   border: 1px solid #d5a64a;
   background: #d5a64a;
   color: #0b1b2b;
 }
 
 .primary-button:hover:not(:disabled),
-.download-button:hover {
+.download-button:hover:not(:disabled) {
   background: #c5943f;
   border-color: #c5943f;
 }
 
-.primary-button:disabled {
+.primary-button:disabled,
+.download-button:disabled {
   cursor: wait;
   opacity: 0.68;
 }

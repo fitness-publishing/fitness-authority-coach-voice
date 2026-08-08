@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { jsPDF } from "jspdf";
 import {
   ConversationProvider,
   useConversationControls,
@@ -35,9 +36,6 @@ function mergeTranscript(previous, incoming) {
   const next = [...previous];
   const last = next[next.length - 1];
 
-  // ElevenLabs can emit tentative and final user transcriptions.
-  // If the newest event is a longer refinement of the same speaker's
-  // immediately preceding text, replace that text instead of duplicating it.
   if (last && last.role === incoming.role) {
     if (incoming.text === last.text) return previous;
 
@@ -55,44 +53,216 @@ function mergeTranscript(previous, incoming) {
   return next;
 }
 
-function formatTranscript(entries, conversationId) {
-  const now = new Date();
-  const readableDate = now.toLocaleString();
-
-  const lines = [
-    "THE FITNESS AUTHORITY COACH",
-    "Coaching Session Transcript",
-    "",
-    `Session date: ${readableDate}`,
-    conversationId ? `Conversation ID: ${conversationId}` : "",
-    "",
-    "----------------------------------------",
-    ""
-  ].filter(Boolean);
-
-  for (const entry of entries) {
-    const speaker = entry.role === "user" ? "You" : "Fitness Authority Coach";
-    lines.push(`${speaker}:`);
-    lines.push(entry.text);
-    lines.push("");
-  }
-
-  lines.push("----------------------------------------");
-  lines.push("");
-  lines.push(
-    "Keep this transcript for your notes or bring it to your next coaching call with Rick."
-  );
-
-  return lines.join("\n");
-}
-
-function transcriptFilename() {
+function pdfFilename() {
   const date = new Date();
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
 
-  return `Fitness-Authority-Coach-Session-${yyyy}-${mm}-${dd}.txt`;
+  return `Fitness-Authority-Coach-Session-${yyyy}-${mm}-${dd}.pdf`;
+}
+
+function imageUrlToDataUrl(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+
+      const context = canvas.getContext("2d");
+      context.drawImage(image, 0, 0);
+
+      resolve(canvas.toDataURL("image/png"));
+    };
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+async function createTranscriptPdf(entries, conversationId) {
+  const doc = new jsPDF({
+    orientation: "portrait",
+    unit: "pt",
+    format: "letter"
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  const marginX = 54;
+  const bottomMargin = 56;
+  const contentWidth = pageWidth - marginX * 2;
+
+  const navy = [11, 27, 43];
+  const gold = [213, 166, 74];
+  const gray = [92, 101, 112];
+  const lightGray = [231, 233, 236];
+
+  let y = 48;
+
+  const addPageHeader = (showLogo = false) => {
+    doc.setDrawColor(...lightGray);
+    doc.setLineWidth(0.7);
+    doc.line(marginX, 42, pageWidth - marginX, 42);
+
+    if (!showLogo) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...gray);
+      doc.text("THE FITNESS AUTHORITY COACH", marginX, 30);
+    }
+
+    y = 62;
+  };
+
+  const ensureRoom = (neededHeight) => {
+    if (y + neededHeight <= pageHeight - bottomMargin) return;
+
+    doc.addPage();
+    addPageHeader(false);
+  };
+
+  const addWrappedText = (
+    text,
+    {
+      fontSize = 10.5,
+      fontStyle = "normal",
+      color = navy,
+      indent = 0,
+      lineHeight = 15,
+      gapAfter = 8
+    } = {}
+  ) => {
+    doc.setFont("helvetica", fontStyle);
+    doc.setFontSize(fontSize);
+    doc.setTextColor(...color);
+
+    const lines = doc.splitTextToSize(text, contentWidth - indent);
+    const blockHeight = lines.length * lineHeight;
+
+    ensureRoom(blockHeight + gapAfter);
+
+    doc.text(lines, marginX + indent, y, {
+      lineHeightFactor: lineHeight / fontSize
+    });
+
+    y += blockHeight + gapAfter;
+  };
+
+  try {
+    const logoData = await imageUrlToDataUrl("/fac-logo.png");
+    doc.addImage(logoData, "PNG", marginX, y, 68, 68);
+  } catch (error) {
+    console.warn("Logo could not be added to PDF.", error);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(20);
+  doc.setTextColor(...navy);
+  doc.text("Coaching Session Transcript", marginX + 86, y + 25);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9.5);
+  doc.setTextColor(...gray);
+  doc.text("The Fitness Authority Coach", marginX + 86, y + 45);
+
+  y += 92;
+
+  doc.setDrawColor(...gold);
+  doc.setLineWidth(2.2);
+  doc.line(marginX, y, pageWidth - marginX, y);
+  y += 22;
+
+  const sessionDate = new Date().toLocaleString();
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...navy);
+  doc.text("SESSION DATE", marginX, y);
+
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...gray);
+  doc.text(sessionDate, marginX + 88, y);
+
+  y += 17;
+
+  if (conversationId) {
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...navy);
+    doc.text("CONVERSATION ID", marginX, y);
+
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...gray);
+    doc.text(conversationId, marginX + 88, y);
+    y += 17;
+  }
+
+  y += 14;
+
+  entries.forEach((entry) => {
+    const isUser = entry.role === "user";
+    const label = isUser ? "YOU" : "FITNESS AUTHORITY COACH";
+
+    ensureRoom(46);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...(isUser ? gray : gold));
+    doc.text(label, marginX, y);
+
+    y += 15;
+
+    addWrappedText(entry.text, {
+      fontSize: 10.5,
+      fontStyle: "normal",
+      color: navy,
+      lineHeight: 15,
+      gapAfter: 14
+    });
+  });
+
+  ensureRoom(78);
+
+  doc.setDrawColor(...lightGray);
+  doc.setLineWidth(0.7);
+  doc.line(marginX, y, pageWidth - marginX, y);
+  y += 22;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.setTextColor(...navy);
+  doc.text("Keep this transcript.", marginX, y);
+  y += 17;
+
+  addWrappedText(
+    "Use it for your notes, revisit the decisions you made, or bring it to your next coaching call with Rick.",
+    {
+      fontSize: 9.5,
+      color: gray,
+      lineHeight: 14,
+      gapAfter: 0
+    }
+  );
+
+  const totalPages = doc.getNumberOfPages();
+
+  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+    doc.setPage(pageNumber);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...gray);
+
+    doc.text(
+      `The Fitness Authority Coach | Page ${pageNumber} of ${totalPages}`,
+      pageWidth / 2,
+      pageHeight - 28,
+      { align: "center" }
+    );
+  }
+
+  doc.save(pdfFilename());
 }
 
 function VoiceCoach({
@@ -109,8 +279,10 @@ function VoiceCoach({
   const { status } = useConversationStatus();
   const { isMuted, setMuted } = useConversationInput();
   const { isSpeaking, isListening } = useConversationMode();
+
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
+  const [creatingPdf, setCreatingPdf] = useState(false);
 
   const connected = status === "connected";
   const connecting = status === "connecting" || starting;
@@ -149,19 +321,18 @@ function VoiceCoach({
     setSessionEnded(true);
   }
 
-  function handleDownload() {
-    const text = formatTranscript(transcript, conversationId);
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
+  async function handleDownload() {
+    setError("");
+    setCreatingPdf(true);
 
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = transcriptFilename();
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    try {
+      await createTranscriptPdf(transcript, conversationId);
+    } catch (err) {
+      console.error(err);
+      setError("The PDF could not be created. Please try again.");
+    } finally {
+      setCreatingPdf(false);
+    }
   }
 
   let statusText = "Ready when you are";
@@ -222,9 +393,13 @@ function VoiceCoach({
                   className="download-button"
                   type="button"
                   onClick={handleDownload}
+                  disabled={creatingPdf}
                 >
-                  Download Conversation Transcript
+                  {creatingPdf
+                    ? "Creating PDF..."
+                    : "Download Conversation Transcript (PDF)"}
                 </button>
+
                 <p className="transcript-note">
                   Keep this transcript for your notes or bring it to your next
                   coaching call with Rick.
@@ -263,9 +438,6 @@ function App() {
   const [conversationId, setConversationId] = useState("");
   const [sessionEnded, setSessionEnded] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
-
-  const transcriptRef = useRef([]);
-  transcriptRef.current = transcript;
 
   const handleMessage = useCallback((message) => {
     const cleaned = cleanMessage(message);
