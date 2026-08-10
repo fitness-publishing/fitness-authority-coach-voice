@@ -139,15 +139,23 @@ async function createTranscriptPdf(entries, conversationId) {
     doc.setTextColor(...color);
 
     const lines = doc.splitTextToSize(text, contentWidth - indent);
-    const blockHeight = lines.length * lineHeight;
 
-    ensureRoom(blockHeight + gapAfter);
+    // Render line-by-line so a long user or Coach message can continue
+    // across as many PDF pages as needed instead of being cut off.
+    for (const line of lines) {
+      if (y + lineHeight > pageHeight - bottomMargin) {
+        doc.addPage();
+        addPageHeader(false);
+        doc.setFont("helvetica", fontStyle);
+        doc.setFontSize(fontSize);
+        doc.setTextColor(...color);
+      }
 
-    doc.text(lines, marginX + indent, y, {
-      lineHeightFactor: lineHeight / fontSize
-    });
+      doc.text(line, marginX + indent, y);
+      y += lineHeight;
+    }
 
-    y += blockHeight + gapAfter;
+    y += gapAfter;
   };
 
   try {

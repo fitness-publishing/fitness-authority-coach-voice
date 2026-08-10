@@ -2,6 +2,10 @@
 
 Inline voice interface for The Fitness Authority Coach, powered by ElevenLabs Agents.
 
+## Version 1.2.1
+
+Fixed PDF pagination so long individual user or Coach responses continue across multiple pages instead of being cut off.
+
 ## Version 1.2
 
 The post-session transcript now downloads as a branded PDF instead of a TXT file.
