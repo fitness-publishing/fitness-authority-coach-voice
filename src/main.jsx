@@ -431,8 +431,10 @@ function VoiceCoach({
 
         {!sessionEnded && (
           <p className="permission-note">
-            Your browser will ask for microphone permission when you start.
-          </p>
+  Voice sessions are spoken only. For written content review, use the ChatGPT
+  version of The Fitness Authority Coach. After your session, you can download
+  a PDF transcript to keep for your notes.
+</p>
         )}
 
         {error && <div className="error-message">{error}</div>}
