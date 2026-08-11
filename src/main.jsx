@@ -433,7 +433,7 @@ function VoiceCoach({
           <p className="permission-note">
   Voice sessions are spoken only. For written content review, use the ChatGPT
   version of The Fitness Authority Coach. After your session, you can download
-  a PDF transcript to keep for your notes.
+  a PDF transcript of your conversation to keep for your notes.
 </p>
         )}
 
