@@ -10,7 +10,7 @@ import {
 } from "@elevenlabs/react";
 import "./styles.css";
 
-const AGENT_ID = "agent_0101kzh93spaer0acy9nef2agqm4";
+const AGENT_ID = "agent_8601kzvvv4v7e2b99kb0mtqxsmfr";
 
 function cleanMessage(message) {
   if (!message || typeof message.message !== "string") return null;
