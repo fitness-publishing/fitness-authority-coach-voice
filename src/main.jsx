@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { jsPDF } from "jspdf";
 import {
@@ -140,8 +140,6 @@ async function createTranscriptPdf(entries, conversationId) {
 
     const lines = doc.splitTextToSize(text, contentWidth - indent);
 
-    // Render line-by-line so a long user or Coach message can continue
-    // across as many PDF pages as needed instead of being cut off.
     for (const line of lines) {
       if (y + lineHeight > pageHeight - bottomMargin) {
         doc.addPage();
@@ -273,7 +271,7 @@ async function createTranscriptPdf(entries, conversationId) {
   doc.save(pdfFilename());
 }
 
-function VoiceCoach({
+function CoachApp({
   transcript,
   setTranscript,
   conversationId,
@@ -283,7 +281,12 @@ function VoiceCoach({
   sessionStarted,
   setSessionStarted
 }) {
-  const { startSession, endSession } = useConversationControls();
+  const {
+    startSession,
+    endSession,
+    sendUserMessage,
+    sendUserActivity
+  } = useConversationControls();
   const { status } = useConversationStatus();
   const { isMuted, setMuted } = useConversationInput();
   const { isSpeaking, isListening } = useConversationMode();
@@ -291,14 +294,24 @@ function VoiceCoach({
   const [error, setError] = useState("");
   const [starting, setStarting] = useState(false);
   const [creatingPdf, setCreatingPdf] = useState(false);
+  const [typedMessage, setTypedMessage] = useState("");
+  const transcriptEndRef = useRef(null);
 
   const connected = status === "connected";
   const connecting = status === "connecting" || starting;
   const canDownload = sessionEnded && transcript.length > 0;
 
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest"
+    });
+  }, [transcript]);
+
   async function handleStart() {
     setError("");
     setStarting(true);
+    setTypedMessage("");
     setTranscript([]);
     setConversationId("");
     setSessionEnded(false);
@@ -316,7 +329,7 @@ function VoiceCoach({
       console.error(err);
       setSessionStarted(false);
       setError(
-        "Microphone access is required for a voice coaching session. Please allow microphone access and try again."
+        "Microphone access is required to start a coaching session. Please allow microphone access and try again."
       );
     } finally {
       setStarting(false);
@@ -327,6 +340,49 @@ function VoiceCoach({
     setError("");
     await endSession();
     setSessionEnded(true);
+  }
+
+  function handleTyping(event) {
+    setTypedMessage(event.target.value);
+
+    if (connected) {
+      try {
+        sendUserActivity();
+      } catch (err) {
+        console.warn("Could not send user activity.", err);
+      }
+    }
+  }
+
+  function handleSend(event) {
+    event.preventDefault();
+
+    const text = typedMessage.trim();
+    if (!text || !connected) return;
+
+    setError("");
+
+    try {
+      // Add the typed message immediately so the interface feels responsive.
+      // If ElevenLabs echoes the same user message through onMessage,
+      // mergeTranscript will prevent a duplicate.
+      setTranscript((previous) =>
+        mergeTranscript(previous, { role: "user", text })
+      );
+
+      sendUserMessage(text);
+      setTypedMessage("");
+    } catch (err) {
+      console.error(err);
+      setError("Your message could not be sent. Please try again.");
+    }
+  }
+
+  function handleKeyDown(event) {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      handleSend(event);
+    }
   }
 
   async function handleDownload() {
@@ -352,7 +408,10 @@ function VoiceCoach({
 
   return (
     <main className="shell">
-      <section className="coach-card" aria-label="The Fitness Authority Coach voice session">
+      <section
+        className="coach-card"
+        aria-label="The Fitness Authority Coach session"
+      >
         <img
           src="/fac-logo.png"
           alt="The Fitness Authority Coach"
@@ -361,14 +420,47 @@ function VoiceCoach({
 
         <h1>Ready to work through something?</h1>
         <p className="intro">
-          Start a focused voice coaching session. Work through one issue at a time
-          and leave with a clear next step.
+          Talk or type. Switch between the two anytime during the same coaching
+          session and leave with a clear next step.
         </p>
 
         <div className={`status ${connected ? "live" : ""}`}>
           <span className="status-dot" aria-hidden="true"></span>
           <span>{statusText}</span>
         </div>
+
+        {sessionStarted && transcript.length > 0 && (
+          <div className="conversation-panel" aria-live="polite">
+            <div className="conversation-list">
+              {transcript.map((entry, index) => (
+                <div
+                  className={`message-row ${
+                    entry.role === "user" ? "user-row" : "coach-row"
+                  }`}
+                  key={`${entry.role}-${index}-${entry.text.slice(0, 24)}`}
+                >
+                  <div
+                    className={`message-bubble ${
+                      entry.role === "user" ? "user-bubble" : "coach-bubble"
+                    }`}
+                  >
+                    <span className="message-label">
+                      {entry.role === "user" ? "You" : "Fitness Authority Coach"}
+                    </span>
+                    <span className="message-text">{entry.text}</span>
+                  </div>
+                </div>
+              ))}
+              <div ref={transcriptEndRef} />
+            </div>
+          </div>
+        )}
+
+        {sessionStarted && connected && transcript.length === 0 && (
+          <div className="conversation-panel empty-conversation">
+            Your conversation will appear here as you talk or type.
+          </div>
+        )}
 
         {!connected && !sessionEnded ? (
           <button
@@ -380,19 +472,51 @@ function VoiceCoach({
             {connecting ? "Connecting..." : "Start Coaching Session"}
           </button>
         ) : connected ? (
-          <div className="controls">
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => setMuted(!isMuted)}
-            >
-              {isMuted ? "Unmute Microphone" : "Mute Microphone"}
-            </button>
+          <>
+            <form className="text-composer" onSubmit={handleSend}>
+              <label className="composer-label" htmlFor="coach-message">
+                Type a message
+              </label>
+              <div className="composer-row">
+                <textarea
+                  id="coach-message"
+                  value={typedMessage}
+                  onChange={handleTyping}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Type or paste your message here..."
+                  rows="3"
+                />
+                <button
+                  className="send-button"
+                  type="submit"
+                  disabled={!typedMessage.trim()}
+                >
+                  Send
+                </button>
+              </div>
+              <p className="composer-help">
+                Press Enter to send. Use Shift + Enter for a new line.
+              </p>
+            </form>
 
-            <button className="end-button" type="button" onClick={handleEnd}>
-              End Session
-            </button>
-          </div>
+            <div className="voice-divider">
+              <span>Voice controls</span>
+            </div>
+
+            <div className="controls">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setMuted(!isMuted)}
+              >
+                {isMuted ? "Unmute Microphone" : "Mute Microphone"}
+              </button>
+
+              <button className="end-button" type="button" onClick={handleEnd}>
+                End Session
+              </button>
+            </div>
+          </>
         ) : (
           <div className="session-complete">
             {canDownload ? (
@@ -429,12 +553,11 @@ function VoiceCoach({
           </div>
         )}
 
-        {!sessionEnded && (
+        {!sessionEnded && !connected && (
           <p className="permission-note">
-  Voice sessions are spoken only. For written content review, use the ChatGPT
-  version of The Fitness Authority Coach. After your session, you can download
-  a PDF transcript of your conversation to keep for your notes.
-</p>
+            Your browser will ask for microphone permission when you start. Once
+            connected, you can speak, type, or switch between both.
+          </p>
         )}
 
         {error && <div className="error-message">{error}</div>}
@@ -472,7 +595,7 @@ function App() {
 
   return (
     <ConversationProvider {...providerProps}>
-      <VoiceCoach
+      <CoachApp
         transcript={transcript}
         setTranscript={setTranscript}
         conversationId={conversationId}
