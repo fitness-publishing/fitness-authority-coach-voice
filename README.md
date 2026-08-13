@@ -1,48 +1,40 @@
-# The Fitness Authority Coach — Dual Mode Test v2
+# The Fitness Authority Coach — Dual Mode Test v3
 
-This build adds mode switching while keeping the visible conversation intact.
+This build has one objective: improve coaching continuity when switching between text and voice.
 
-## What v2 tests
+## What changed from v2
 
-### Text → Voice
-1. End the current text-only ElevenLabs conversation.
-2. Keep the local transcript visible.
-3. Start a new voice conversation.
-4. Send the recent transcript to the new conversation with `sendContextualUpdate()`.
-5. Use a brief handoff first message instead of restarting the Coach.
-6. Continue by voice.
+v2 sent `sendContextualUpdate()` immediately after `startSession()` returned a conversation ID.
 
-### Voice → Text
-1. End the current voice conversation.
-2. Keep the local transcript visible.
-3. Start a new text-only conversation.
-4. Send the recent transcript with `sendContextualUpdate()`.
-5. Continue by typing.
+ElevenLabs documents `sendContextualUpdate()` as a way to give an agent context without triggering a response. The React SDK also exposes connection status separately as `disconnected`, `connecting`, and `connected`.
 
-## Why this is a new ElevenLabs conversation
+v3 therefore waits until the NEW session explicitly reports `connected`, waits another 500 ms for the transport to settle, and only then sends the continuity context.
 
-ElevenLabs text-only conversations use WebSocket and voice conversations use WebRTC. v2 treats a mode change as a controlled handoff between conversation types while preserving the user's visible experience and passing recent context into the new conversation.
+## Stronger continuity context
 
-## Context handoff
+The handoff now sends up to the last 24 visible conversation turns and explicitly tells the Coach:
 
-The app sends up to the last 12 visible turns using `sendContextualUpdate()`. This method gives the agent context without forcing an immediate response.
+- this is the SAME coaching conversation
+- use prior facts, decisions, drafts, and answers as active context
+- do not restart diagnosis
+- do not ask for information already provided
+- do not ask the user to paste copy the Coach already created
+- resolve references such as “make it more premium” from the prior transcript
+- continue from the exact point where the previous mode ended
 
-## ElevenLabs requirement
+## What did NOT change
 
-Keep:
+- visual design
+- V3 voice configuration
+- agent ID
+- production app
+- PDF export
+- text-first entry
+- voice-first entry
 
-**Security → Overrides → First message = Enabled**
+## GitHub upload
 
-The preview build uses a short first-message override during mode switches:
-
-- “Got it. We can keep going by voice.”
-- “Got it. We can keep going here in text.”
-
-The production app remains untouched.
-
-## Upload to GitHub
-
-Upload these files ONLY to the `dual-mode-test` branch:
+Upload these four files ONLY to the `dual-mode-test` branch:
 
 - `src/main.jsx`
 - `src/styles.css`
@@ -50,3 +42,27 @@ Upload these files ONLY to the `dual-mode-test` branch:
 - `README.md`
 
 Do not merge into `main`.
+
+## Test sequence
+
+### Test A — Text → Voice
+
+1. Start With Text.
+2. Give the Coach a specific business problem.
+3. Let it create or recommend something concrete.
+4. Click Switch to Voice.
+5. Make a dependent reference such as:
+   - “Make that more premium.”
+   - “I like the second idea better. Expand on that.”
+   - “What would you change about the draft you just gave me?”
+6. The Coach should understand what “that,” “second idea,” or “draft” refers to without asking you to repeat it.
+
+### Test B — Voice → Text
+
+1. Continue the same conversation in voice.
+2. Establish one or two additional facts.
+3. Switch to Text.
+4. Type a question that depends on those facts.
+5. The Coach should use them without starting over.
+
+Production remains untouched until this branch passes continuity testing.

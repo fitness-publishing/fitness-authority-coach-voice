@@ -293,7 +293,7 @@ function ModeChooser({ onChoose }) {
         </div>
 
         <p className="test-note">
-          Dual-mode test build. For this first test, each session stays in the mode you choose.
+          Dual-mode continuity test. Start in either mode and switch anytime while keeping the conversation on screen.
         </p>
       </section>
     </main>
@@ -329,6 +329,7 @@ function SessionApp({
   const [typedMessage, setTypedMessage] = useState("");
   const [creatingPdf, setCreatingPdf] = useState(false);
   const startedRef = useRef(false);
+  const handoffDeliveredRef = useRef(false);
   const transcriptEndRef = useRef(null);
 
   const connected = status === "connected";
@@ -360,14 +361,6 @@ function SessionApp({
 
         if (!cancelled && id) {
           setConversationId(id);
-
-          if (handoffContext) {
-            try {
-              sendContextualUpdate(handoffContext);
-            } catch (contextError) {
-              console.warn("Could not send handoff context.", contextError);
-            }
-          }
         }
       } catch (err) {
         console.error(err);
@@ -389,13 +382,40 @@ function SessionApp({
     return () => {
       cancelled = true;
     };
-  }, [
-    mode,
-    startSession,
-    setConversationId,
-    handoffContext,
-    sendContextualUpdate
-  ]);
+  }, [mode, startSession, setConversationId]);
+
+
+  useEffect(() => {
+    if (
+      status !== "connected" ||
+      !handoffContext ||
+      handoffDeliveredRef.current
+    ) {
+      return;
+    }
+
+    handoffDeliveredRef.current = true;
+    let cancelled = false;
+
+    // startSession can resolve before the new transport is fully ready to
+    // accept a contextual update. Deliver the handoff only after the SDK
+    // reports "connected", then give the transport a brief settling window.
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+
+      try {
+        sendContextualUpdate(handoffContext);
+      } catch (contextError) {
+        handoffDeliveredRef.current = false;
+        console.warn("Could not send handoff context.", contextError);
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [status, handoffContext, sendContextualUpdate]);
 
   async function handleEnd() {
     setError("");
@@ -652,7 +672,7 @@ function SessionApp({
 function buildHandoffContext(transcript, fromMode, toMode) {
   if (!transcript.length) return "";
 
-  const recent = transcript.slice(-12);
+  const recent = transcript.slice(-24);
   const history = recent
     .map((entry) => {
       const speaker =
@@ -662,14 +682,19 @@ function buildHandoffContext(transcript, fromMode, toMode) {
     .join("\n");
 
   return [
-    "The user has just switched interaction modes inside the same Fitness Authority Coach experience.",
+    "MODE-SWITCH CONTINUITY CONTEXT",
+    "The user is continuing the SAME coaching conversation after switching interaction modes.",
     `Previous mode: ${fromMode}. New mode: ${toMode}.`,
-    "Continue the coaching conversation naturally from the context below.",
-    "Do not restart the coaching process, reintroduce yourself, or ask the user to repeat information already provided.",
-    "Treat this history as context only and wait for the user's next message before continuing.",
+    "The transcript below contains facts, decisions, requests, drafts, and answers already established in this session.",
+    "Use those details as active conversation context for every response that follows.",
+    "Do not restart diagnosis, reintroduce yourself, ask for information already present below, or ask the user to paste material that you already created in this transcript.",
+    "If the user's next message refers to something indirectly, such as 'make it more premium,' 'change that,' or 'let's continue,' resolve the reference from this transcript.",
+    "Continue from the exact point where the prior mode ended.",
     "",
-    "Recent conversation:",
-    history
+    "PRIOR SESSION TRANSCRIPT:",
+    history,
+    "",
+    "END MODE-SWITCH CONTINUITY CONTEXT"
   ].join("\n");
 }
 
