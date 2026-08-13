@@ -274,6 +274,7 @@ h1 {
 
 .send-button,
 .secondary-button,
+.switch-button,
 .end-button,
 .download-button,
 .new-session-button {
@@ -393,10 +394,28 @@ h1 {
 
   .send-button,
   .secondary-button,
+  .switch-button,
   .end-button,
   .download-button,
   .new-session-button {
     width: 100%;
     min-height: 48px;
   }
+}
+
+
+.switch-button {
+  min-height: 48px;
+  border: 1px solid #d5a64a;
+  background: #fffaf0;
+  color: #0b1b2b;
+}
+
+.switch-button:hover:not(:disabled) {
+  background: #fff4db;
+}
+
+.switch-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
 }

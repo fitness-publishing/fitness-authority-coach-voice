@@ -1,42 +1,52 @@
-# The Fitness Authority Coach — Dual Mode Test v1
+# The Fitness Authority Coach — Dual Mode Test v2
 
-This is an isolated development build for the `dual-mode-test` GitHub branch.
+This build adds mode switching while keeping the visible conversation intact.
 
-## Goal of v1
+## What v2 tests
 
-Prove that both ElevenLabs session types work independently before attempting any mid-conversation mode switching.
+### Text → Voice
+1. End the current text-only ElevenLabs conversation.
+2. Keep the local transcript visible.
+3. Start a new voice conversation.
+4. Send the recent transcript to the new conversation with `sendContextualUpdate()`.
+5. Use a brief handoff first message instead of restarting the Coach.
+6. Continue by voice.
 
-### Start With Text
-- Uses the ElevenLabs React SDK with `textOnly: true`
-- Uses a WebSocket text-only conversation
-- Does not request microphone permission
-- User types messages with `sendUserMessage()`
-- Agent responses are captured by `onMessage`
-- Transcript can be downloaded as a PDF
+### Voice → Text
+1. End the current voice conversation.
+2. Keep the local transcript visible.
+3. Start a new text-only conversation.
+4. Send the recent transcript with `sendContextualUpdate()`.
+5. Continue by typing.
 
-### Start Voice
-- Uses the existing working voice-capable session
-- Requests microphone permission
-- Uses the current V3 agent
-- Typed messages are available once the voice session is connected
-- Transcript can be downloaded as a PDF
+## Why this is a new ElevenLabs conversation
 
-## Important
+ElevenLabs text-only conversations use WebSocket and voice conversations use WebRTC. v2 treats a mode change as a controlled handoff between conversation types while preserving the user's visible experience and passing recent context into the new conversation.
 
-This v1 intentionally does NOT switch a live text-only conversation into voice or vice versa. First we are proving that each entry mode is reliable.
+## Context handoff
 
-## Agent ID
+The app sends up to the last 12 visible turns using `sendContextualUpdate()`. This method gives the agent context without forcing an immediate response.
 
-`agent_8601kzvvv4v7e2b99kb0mtqxsmfr`
+## ElevenLabs requirement
 
-## Deployment
+Keep:
 
-Upload these changed files ONLY to the `dual-mode-test` branch:
+**Security → Overrides → First message = Enabled**
+
+The preview build uses a short first-message override during mode switches:
+
+- “Got it. We can keep going by voice.”
+- “Got it. We can keep going here in text.”
+
+The production app remains untouched.
+
+## Upload to GitHub
+
+Upload these files ONLY to the `dual-mode-test` branch:
+
 - `src/main.jsx`
 - `src/styles.css`
 - `package.json`
 - `README.md`
 
-Do not upload them to `main`.
-
-After committing to `dual-mode-test`, Vercel should create a Preview deployment for that branch.
+Do not merge into `main`.

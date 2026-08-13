@@ -308,13 +308,16 @@ function SessionApp({
   setConversationId,
   sessionEnded,
   setSessionEnded,
+  handoffContext,
+  onSwitchMode,
   onExitMode
 }) {
   const {
     startSession,
     endSession,
     sendUserMessage,
-    sendUserActivity
+    sendUserActivity,
+    sendContextualUpdate
   } = useConversationControls();
 
   const { status } = useConversationStatus();
@@ -357,6 +360,14 @@ function SessionApp({
 
         if (!cancelled && id) {
           setConversationId(id);
+
+          if (handoffContext) {
+            try {
+              sendContextualUpdate(handoffContext);
+            } catch (contextError) {
+              console.warn("Could not send handoff context.", contextError);
+            }
+          }
         }
       } catch (err) {
         console.error(err);
@@ -378,12 +389,30 @@ function SessionApp({
     return () => {
       cancelled = true;
     };
-  }, [mode, startSession, setConversationId]);
+  }, [
+    mode,
+    startSession,
+    setConversationId,
+    handoffContext,
+    sendContextualUpdate
+  ]);
 
   async function handleEnd() {
     setError("");
     await endSession();
     setSessionEnded(true);
+  }
+
+  async function handleSwitch(targetMode) {
+    setError("");
+
+    try {
+      await endSession();
+    } catch (err) {
+      console.warn("Current session was already disconnected.", err);
+    }
+
+    onSwitchMode(targetMode);
   }
 
   function handleTyping(event) {
@@ -474,8 +503,8 @@ function SessionApp({
 
         <p className="intro">
           {mode === "text"
-            ? "Type your question below. This session is text-only, so no microphone is used."
-            : "Talk naturally with the Coach. You can also type during the voice session once connected."}
+            ? "Type your question below. You can switch to voice anytime and keep the visible conversation."
+            : "Talk naturally with the Coach. You can switch to text anytime and keep the visible conversation."}
         </p>
 
         <div className={`status ${connected ? "live" : ""}`}>
@@ -567,6 +596,17 @@ function SessionApp({
               )}
 
               <button
+                className="switch-button"
+                type="button"
+                onClick={() =>
+                  handleSwitch(mode === "text" ? "voice" : "text")
+                }
+                disabled={!connected}
+              >
+                {mode === "text" ? "Switch to Voice" : "Switch to Text"}
+              </button>
+
+              <button
                 className="end-button"
                 type="button"
                 onClick={handleEnd}
@@ -609,12 +649,37 @@ function SessionApp({
   );
 }
 
+function buildHandoffContext(transcript, fromMode, toMode) {
+  if (!transcript.length) return "";
+
+  const recent = transcript.slice(-12);
+  const history = recent
+    .map((entry) => {
+      const speaker =
+        entry.role === "user" ? "User" : "Fitness Authority Coach";
+      return `${speaker}: ${entry.text}`;
+    })
+    .join("\n");
+
+  return [
+    "The user has just switched interaction modes inside the same Fitness Authority Coach experience.",
+    `Previous mode: ${fromMode}. New mode: ${toMode}.`,
+    "Continue the coaching conversation naturally from the context below.",
+    "Do not restart the coaching process, reintroduce yourself, or ask the user to repeat information already provided.",
+    "Treat this history as context only and wait for the user's next message before continuing.",
+    "",
+    "Recent conversation:",
+    history
+  ].join("\n");
+}
+
 function App() {
   const [mode, setMode] = useState(null);
   const [sessionKey, setSessionKey] = useState(0);
   const [transcript, setTranscript] = useState([]);
   const [conversationId, setConversationId] = useState("");
   const [sessionEnded, setSessionEnded] = useState(false);
+  const [handoffContext, setHandoffContext] = useState("");
 
   const handleMessage = useCallback((message) => {
     const cleaned = cleanMessage(message);
@@ -626,25 +691,52 @@ function App() {
     setTranscript([]);
     setConversationId("");
     setSessionEnded(false);
+    setHandoffContext("");
     setMode(nextMode);
     setSessionKey((value) => value + 1);
   }, []);
+
+  const handleSwitchMode = useCallback(
+    (nextMode) => {
+      const context = buildHandoffContext(transcript, mode, nextMode);
+
+      setConversationId("");
+      setSessionEnded(false);
+      setHandoffContext(context);
+      setMode(nextMode);
+      setSessionKey((value) => value + 1);
+    },
+    [transcript, mode]
+  );
 
   const handleExitMode = useCallback(() => {
     setTranscript([]);
     setConversationId("");
     setSessionEnded(false);
+    setHandoffContext("");
     setMode(null);
     setSessionKey((value) => value + 1);
   }, []);
 
-  const providerProps = useMemo(
-    () => ({
+  const providerProps = useMemo(() => {
+    const props = {
       onMessage: handleMessage,
       textOnly: mode === "text"
-    }),
-    [handleMessage, mode]
-  );
+    };
+
+    if (handoffContext) {
+      props.overrides = {
+        agent: {
+          firstMessage:
+            mode === "voice"
+              ? "Got it. We can keep going by voice."
+              : "Got it. We can keep going here in text."
+        }
+      };
+    }
+
+    return props;
+  }, [handleMessage, mode, handoffContext]);
 
   if (!mode) {
     return <ModeChooser onChoose={handleChoose} />;
@@ -663,6 +755,8 @@ function App() {
         setConversationId={setConversationId}
         sessionEnded={sessionEnded}
         setSessionEnded={setSessionEnded}
+        handoffContext={handoffContext}
+        onSwitchMode={handleSwitchMode}
         onExitMode={handleExitMode}
       />
     </ConversationProvider>
