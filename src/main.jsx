@@ -543,7 +543,7 @@ function CoachApp({
                 onClick={handleStartVoice}
                 disabled={connecting}
               >
-                {connecting ? "Connecting..." : "Start Voice"}
+                {connecting ? "Connecting..." : "Start Coaching Session"}
               </button>
             ) : (
               <div className="controls">
