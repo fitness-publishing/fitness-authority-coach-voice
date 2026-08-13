@@ -1,22 +1,29 @@
-# The Fitness Authority Coach — Instant Start Voice + Text
+# The Fitness Authority Coach — Text-First Greeting Fix
 
-This version removes the separate "Start Coaching Session" gateway.
+This version fixes the text-first startup experience.
 
-## New experience
-- The coaching conversation interface is visible immediately.
-- The Coach's opening question is visible as soon as the page loads.
-- Users can type or paste a message immediately.
-- Clicking Send starts the same voice-capable ElevenLabs session and sends the typed message.
-- Users who prefer to speak can click Start Voice.
-- Once connected, voice and typed messages remain in the same conversation.
-- PDF transcript, mute, end-session, logo, and responsive layout remain.
+## What changed
+- Voice-first sessions keep the normal spoken ElevenLabs First Message.
+- Text-first sessions suppress the spoken First Message for that session.
+- The user's typed message becomes the first real user turn, so the Coach responds directly to it.
+- Voice and text remain available inside the same voice-capable session.
+- The existing instant-start interface, V3 agent, PDF transcript, mute controls, and session controls remain.
 
-## Important browser behavior
-A voice-capable ElevenLabs session requires microphone permission. On first use, a user who clicks Send or Start Voice may see the browser's microphone permission prompt. This keeps voice and text available inside one continuous session.
+## REQUIRED ElevenLabs setting
+Before this build can suppress the greeting on text-first sessions:
+
+1. Open the live V3 Fitness Authority Coach agent in ElevenLabs.
+2. Go to **Security**.
+3. Find **Overrides**.
+4. Enable **First message**.
+5. Save/publish the agent.
+
+ElevenLabs disables overrides by default. If First message override is not enabled, the text-first suppression may fail.
 
 ## Deployment
-Replace the matching files in the existing GitHub repository. Vercel should redeploy automatically. The GHL iframe URL does not need to change.
+Replace the matching files in the existing GitHub repository:
+- `src/main.jsx`
+- `package.json`
+- `README.md`
 
-## Agent
-This build uses the current V3 agent ID:
-agent_8601kzvvv4v7e2b99kb0mtqxsmfr
+Vercel should redeploy automatically. The GHL iframe URL and height do not need to change.
