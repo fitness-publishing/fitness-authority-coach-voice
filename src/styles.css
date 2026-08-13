@@ -391,3 +391,16 @@ h1 {
     width: 100%;
   }
 }
+
+
+.startup-instruction {
+  margin-top: 10px;
+  font-size: 0.98rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: #0b1b2b;
+}
+
+.startup-instruction strong {
+  font-weight: 800;
+}
