@@ -11,6 +11,8 @@ import {
 import "./styles.css";
 
 const AGENT_ID = "agent_8601kzvvv4v7e2b99kb0mtqxsmfr";
+const WELCOME_MESSAGE =
+  "Hey, it’s the Fitness Authority Coach. What are you working through in your business today?";
 
 function cleanMessage(message) {
   if (!message || typeof message.message !== "string") return null;
@@ -308,16 +310,22 @@ function CoachApp({
     });
   }, [transcript]);
 
-  async function handleStart() {
+  async function connectSession({ pendingText = "", reset = false } = {}) {
     setError("");
     setStarting(true);
-    setTypedMessage("");
-    setTranscript([]);
-    setConversationId("");
-    setSessionEnded(false);
+
+    if (reset) {
+      setTranscript([]);
+      setConversationId("");
+      setSessionEnded(false);
+    }
+
     setSessionStarted(true);
 
     try {
+      // A full voice-capable ElevenLabs session requires microphone permission.
+      // Starting from the text box still uses the same voice + text conversation,
+      // so the user can switch to speaking at any time without starting over.
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const id = await startSession({
@@ -325,15 +333,30 @@ function CoachApp({
       });
 
       if (id) setConversationId(id);
+
+      if (pendingText.trim()) {
+        const text = pendingText.trim();
+
+        setTranscript((previous) =>
+          mergeTranscript(previous, { role: "user", text })
+        );
+
+        sendUserMessage(text);
+        setTypedMessage("");
+      }
     } catch (err) {
       console.error(err);
       setSessionStarted(false);
       setError(
-        "Microphone access is required to start a coaching session. Please allow microphone access and try again."
+        "To keep voice and text available in the same session, please allow microphone access. You can mute the microphone after connecting if you prefer to type."
       );
     } finally {
       setStarting(false);
     }
+  }
+
+  async function handleStartVoice() {
+    await connectSession({ reset: transcript.length === 0 });
   }
 
   async function handleEnd() {
@@ -354,13 +377,21 @@ function CoachApp({
     }
   }
 
-  function handleSend(event) {
+  async function handleSend(event) {
     event.preventDefault();
 
     const text = typedMessage.trim();
-    if (!text || !connected) return;
+    if (!text || connecting || sessionEnded) return;
 
     setError("");
+
+    if (!connected) {
+      await connectSession({
+        pendingText: text,
+        reset: transcript.length === 0
+      });
+      return;
+    }
 
     try {
       // Add the typed message immediately so the interface feels responsive.
@@ -399,12 +430,26 @@ function CoachApp({
     }
   }
 
+  async function handleNewSession() {
+    setTypedMessage("");
+    setTranscript([]);
+    setConversationId("");
+    setSessionEnded(false);
+    setSessionStarted(false);
+    setError("");
+  }
+
   let statusText = "Ready when you are";
   if (connecting) statusText = "Connecting...";
   if (connected && isSpeaking) statusText = "Coach is responding";
   else if (connected && isListening) statusText = "Listening";
   else if (connected) statusText = "Session connected";
   else if (sessionEnded) statusText = "Session complete";
+
+  const displayedTranscript =
+    transcript.length > 0
+      ? transcript
+      : [{ role: "coach", text: WELCOME_MESSAGE, preview: true }];
 
   return (
     <main className="shell">
@@ -429,50 +474,35 @@ function CoachApp({
           <span>{statusText}</span>
         </div>
 
-        {sessionStarted && transcript.length > 0 && (
-          <div className="conversation-panel" aria-live="polite">
-            <div className="conversation-list">
-              {transcript.map((entry, index) => (
-                <div
-                  className={`message-row ${
-                    entry.role === "user" ? "user-row" : "coach-row"
-                  }`}
-                  key={`${entry.role}-${index}-${entry.text.slice(0, 24)}`}
-                >
-                  <div
-                    className={`message-bubble ${
-                      entry.role === "user" ? "user-bubble" : "coach-bubble"
-                    }`}
-                  >
-                    <span className="message-label">
-                      {entry.role === "user" ? "You" : "Fitness Authority Coach"}
-                    </span>
-                    <span className="message-text">{entry.text}</span>
-                  </div>
-                </div>
-              ))}
-              <div ref={transcriptEndRef} />
-            </div>
-          </div>
-        )}
-
-        {sessionStarted && connected && transcript.length === 0 && (
-          <div className="conversation-panel empty-conversation">
-            Your conversation will appear here as you talk or type.
-          </div>
-        )}
-
-        {!connected && !sessionEnded ? (
-          <button
-            className="primary-button"
-            type="button"
-            onClick={handleStart}
-            disabled={connecting}
-          >
-            {connecting ? "Connecting..." : "Start Coaching Session"}
-          </button>
-        ) : connected ? (
+        {!sessionEnded && (
           <>
+            <div className="conversation-panel" aria-live="polite">
+              <div className="conversation-list">
+                {displayedTranscript.map((entry, index) => (
+                  <div
+                    className={`message-row ${
+                      entry.role === "user" ? "user-row" : "coach-row"
+                    }`}
+                    key={`${entry.role}-${index}-${entry.text.slice(0, 24)}`}
+                  >
+                    <div
+                      className={`message-bubble ${
+                        entry.role === "user" ? "user-bubble" : "coach-bubble"
+                      } ${entry.preview ? "preview-bubble" : ""}`}
+                    >
+                      <span className="message-label">
+                        {entry.role === "user"
+                          ? "You"
+                          : "Fitness Authority Coach"}
+                      </span>
+                      <span className="message-text">{entry.text}</span>
+                    </div>
+                  </div>
+                ))}
+                <div ref={transcriptEndRef} />
+              </div>
+            </div>
+
             <form className="text-composer" onSubmit={handleSend}>
               <label className="composer-label" htmlFor="coach-message">
                 Type a message
@@ -485,39 +515,55 @@ function CoachApp({
                   onKeyDown={handleKeyDown}
                   placeholder="Type or paste your message here..."
                   rows="3"
+                  disabled={connecting}
                 />
                 <button
                   className="send-button"
                   type="submit"
-                  disabled={!typedMessage.trim()}
+                  disabled={!typedMessage.trim() || connecting}
                 >
-                  Send
+                  {connecting ? "Connecting..." : "Send"}
                 </button>
               </div>
               <p className="composer-help">
-                Press Enter to send. Use Shift + Enter for a new line.
+                Type and press Send, or use voice below. On your first use, your
+                browser may ask for microphone permission so you can switch
+                between voice and text anytime.
               </p>
             </form>
 
             <div className="voice-divider">
-              <span>Voice controls</span>
+              <span>Or talk it through</span>
             </div>
 
-            <div className="controls">
+            {!connected ? (
               <button
-                className="secondary-button"
+                className="voice-start-button"
                 type="button"
-                onClick={() => setMuted(!isMuted)}
+                onClick={handleStartVoice}
+                disabled={connecting}
               >
-                {isMuted ? "Unmute Microphone" : "Mute Microphone"}
+                {connecting ? "Connecting..." : "Start Voice"}
               </button>
+            ) : (
+              <div className="controls">
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => setMuted(!isMuted)}
+                >
+                  {isMuted ? "Unmute Microphone" : "Mute Microphone"}
+                </button>
 
-              <button className="end-button" type="button" onClick={handleEnd}>
-                End Session
-              </button>
-            </div>
+                <button className="end-button" type="button" onClick={handleEnd}>
+                  End Session
+                </button>
+              </div>
+            )}
           </>
-        ) : (
+        )}
+
+        {sessionEnded && (
           <div className="session-complete">
             {canDownload ? (
               <>
@@ -546,18 +592,11 @@ function CoachApp({
             <button
               className="new-session-button"
               type="button"
-              onClick={handleStart}
+              onClick={handleNewSession}
             >
               Start New Session
             </button>
           </div>
-        )}
-
-        {!sessionEnded && !connected && (
-          <p className="permission-note">
-            Your browser will ask for microphone permission when you start. Once
-            connected, you can speak, type, or switch between both.
-          </p>
         )}
 
         {error && <div className="error-message">{error}</div>}
