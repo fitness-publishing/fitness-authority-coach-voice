@@ -1,22 +1,42 @@
-# The Fitness Authority Coach — Instant Start Voice + Text
+# The Fitness Authority Coach — Dual Mode Test v1
 
-This version removes the separate "Start Coaching Session" gateway.
+This is an isolated development build for the `dual-mode-test` GitHub branch.
 
-## New experience
-- The coaching conversation interface is visible immediately.
-- The Coach's opening question is visible as soon as the page loads.
-- Users can type or paste a message immediately.
-- Clicking Send starts the same voice-capable ElevenLabs session and sends the typed message.
-- Users who prefer to speak can click Start Voice.
-- Once connected, voice and typed messages remain in the same conversation.
-- PDF transcript, mute, end-session, logo, and responsive layout remain.
+## Goal of v1
 
-## Important browser behavior
-A voice-capable ElevenLabs session requires microphone permission. On first use, a user who clicks Send or Start Voice may see the browser's microphone permission prompt. This keeps voice and text available inside one continuous session.
+Prove that both ElevenLabs session types work independently before attempting any mid-conversation mode switching.
+
+### Start With Text
+- Uses the ElevenLabs React SDK with `textOnly: true`
+- Uses a WebSocket text-only conversation
+- Does not request microphone permission
+- User types messages with `sendUserMessage()`
+- Agent responses are captured by `onMessage`
+- Transcript can be downloaded as a PDF
+
+### Start Voice
+- Uses the existing working voice-capable session
+- Requests microphone permission
+- Uses the current V3 agent
+- Typed messages are available once the voice session is connected
+- Transcript can be downloaded as a PDF
+
+## Important
+
+This v1 intentionally does NOT switch a live text-only conversation into voice or vice versa. First we are proving that each entry mode is reliable.
+
+## Agent ID
+
+`agent_8601kzvvv4v7e2b99kb0mtqxsmfr`
 
 ## Deployment
-Replace the matching files in the existing GitHub repository. Vercel should redeploy automatically. The GHL iframe URL does not need to change.
 
-## Agent
-This build uses the current V3 agent ID:
-agent_8601kzvvv4v7e2b99kb0mtqxsmfr
+Upload these changed files ONLY to the `dual-mode-test` branch:
+- `src/main.jsx`
+- `src/styles.css`
+- `package.json`
+- `README.md`
+
+Do not upload them to `main`.
+
+After committing to `dual-mode-test`, Vercel should create a Preview deployment for that branch.

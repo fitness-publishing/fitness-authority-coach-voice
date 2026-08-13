@@ -11,12 +11,9 @@ import {
 import "./styles.css";
 
 const AGENT_ID = "agent_8601kzvvv4v7e2b99kb0mtqxsmfr";
-const WELCOME_MESSAGE =
-  "Hey, it’s the Fitness Authority Coach. What are you working through in your business today?";
 
 function cleanMessage(message) {
   if (!message || typeof message.message !== "string") return null;
-
   const text = message.message.trim();
   if (!text) return null;
 
@@ -28,13 +25,11 @@ function cleanMessage(message) {
         : null;
 
   if (!role) return null;
-
   return { role, text };
 }
 
 function mergeTranscript(previous, incoming) {
   if (!incoming) return previous;
-
   const next = [...previous];
   const last = next[next.length - 1];
 
@@ -55,13 +50,13 @@ function mergeTranscript(previous, incoming) {
   return next;
 }
 
-function pdfFilename() {
+function pdfFilename(mode) {
   const date = new Date();
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
-
-  return `Fitness-Authority-Coach-Session-${yyyy}-${mm}-${dd}.pdf`;
+  const suffix = mode === "text" ? "Text" : "Voice";
+  return `Fitness-Authority-Coach-${suffix}-Session-${yyyy}-${mm}-${dd}.pdf`;
 }
 
 function imageUrlToDataUrl(url) {
@@ -71,10 +66,8 @@ function imageUrlToDataUrl(url) {
       const canvas = document.createElement("canvas");
       canvas.width = image.naturalWidth;
       canvas.height = image.naturalHeight;
-
       const context = canvas.getContext("2d");
       context.drawImage(image, 0, 0);
-
       resolve(canvas.toDataURL("image/png"));
     };
     image.onerror = reject;
@@ -82,7 +75,7 @@ function imageUrlToDataUrl(url) {
   });
 }
 
-async function createTranscriptPdf(entries, conversationId) {
+async function createTranscriptPdf(entries, conversationId, mode) {
   const doc = new jsPDF({
     orientation: "portrait",
     unit: "pt",
@@ -91,7 +84,6 @@ async function createTranscriptPdf(entries, conversationId) {
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-
   const marginX = 54;
   const bottomMargin = 56;
   const contentWidth = pageWidth - marginX * 2;
@@ -100,29 +92,23 @@ async function createTranscriptPdf(entries, conversationId) {
   const gold = [213, 166, 74];
   const gray = [92, 101, 112];
   const lightGray = [231, 233, 236];
-
   let y = 48;
 
-  const addPageHeader = (showLogo = false) => {
+  const addPageHeader = () => {
     doc.setDrawColor(...lightGray);
     doc.setLineWidth(0.7);
     doc.line(marginX, 42, pageWidth - marginX, 42);
-
-    if (!showLogo) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(8.5);
-      doc.setTextColor(...gray);
-      doc.text("THE FITNESS AUTHORITY COACH", marginX, 30);
-    }
-
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...gray);
+    doc.text("THE FITNESS AUTHORITY COACH", marginX, 30);
     y = 62;
   };
 
   const ensureRoom = (neededHeight) => {
     if (y + neededHeight <= pageHeight - bottomMargin) return;
-
     doc.addPage();
-    addPageHeader(false);
+    addPageHeader();
   };
 
   const addWrappedText = (
@@ -131,7 +117,6 @@ async function createTranscriptPdf(entries, conversationId) {
       fontSize = 10.5,
       fontStyle = "normal",
       color = navy,
-      indent = 0,
       lineHeight = 15,
       gapAfter = 8
     } = {}
@@ -140,18 +125,18 @@ async function createTranscriptPdf(entries, conversationId) {
     doc.setFontSize(fontSize);
     doc.setTextColor(...color);
 
-    const lines = doc.splitTextToSize(text, contentWidth - indent);
+    const lines = doc.splitTextToSize(text, contentWidth);
 
     for (const line of lines) {
       if (y + lineHeight > pageHeight - bottomMargin) {
         doc.addPage();
-        addPageHeader(false);
+        addPageHeader();
         doc.setFont("helvetica", fontStyle);
         doc.setFontSize(fontSize);
         doc.setTextColor(...color);
       }
 
-      doc.text(line, marginX + indent, y);
+      doc.text(line, marginX, y);
       y += lineHeight;
     }
 
@@ -173,16 +158,17 @@ async function createTranscriptPdf(entries, conversationId) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9.5);
   doc.setTextColor(...gray);
-  doc.text("The Fitness Authority Coach", marginX + 86, y + 45);
+  doc.text(
+    `The Fitness Authority Coach · ${mode === "text" ? "Text" : "Voice"} Session`,
+    marginX + 86,
+    y + 45
+  );
 
   y += 92;
-
   doc.setDrawColor(...gold);
   doc.setLineWidth(2.2);
   doc.line(marginX, y, pageWidth - marginX, y);
   y += 22;
-
-  const sessionDate = new Date().toLocaleString();
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
@@ -191,8 +177,7 @@ async function createTranscriptPdf(entries, conversationId) {
 
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...gray);
-  doc.text(sessionDate, marginX + 88, y);
-
+  doc.text(new Date().toLocaleString(), marginX + 88, y);
   y += 17;
 
   if (conversationId) {
@@ -218,12 +203,10 @@ async function createTranscriptPdf(entries, conversationId) {
     doc.setFontSize(9);
     doc.setTextColor(...(isUser ? gray : gold));
     doc.text(label, marginX, y);
-
     y += 15;
 
     addWrappedText(entry.text, {
       fontSize: 10.5,
-      fontStyle: "normal",
       color: navy,
       lineHeight: 15,
       gapAfter: 14
@@ -231,7 +214,6 @@ async function createTranscriptPdf(entries, conversationId) {
   });
 
   ensureRoom(78);
-
   doc.setDrawColor(...lightGray);
   doc.setLineWidth(0.7);
   doc.line(marginX, y, pageWidth - marginX, y);
@@ -257,11 +239,9 @@ async function createTranscriptPdf(entries, conversationId) {
 
   for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
     doc.setPage(pageNumber);
-
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...gray);
-
     doc.text(
       `The Fitness Authority Coach | Page ${pageNumber} of ${totalPages}`,
       pageWidth / 2,
@@ -270,18 +250,65 @@ async function createTranscriptPdf(entries, conversationId) {
     );
   }
 
-  doc.save(pdfFilename());
+  doc.save(pdfFilename(mode));
 }
 
-function CoachApp({
+function ModeChooser({ onChoose }) {
+  return (
+    <main className="shell">
+      <section className="coach-card">
+        <img
+          src="/fac-logo.png"
+          alt="The Fitness Authority Coach"
+          className="fac-logo"
+        />
+
+        <h1>How would you like to start?</h1>
+        <p className="intro">
+          Choose text for a quiet written conversation, or choose voice when you want to talk it through.
+        </p>
+
+        <div className="mode-grid">
+          <button
+            className="mode-card mode-card-text"
+            type="button"
+            onClick={() => onChoose("text")}
+          >
+            <span className="mode-title">Start With Text</span>
+            <span className="mode-description">
+              Type your question and get a written response. No microphone permission required.
+            </span>
+          </button>
+
+          <button
+            className="mode-card mode-card-voice"
+            type="button"
+            onClick={() => onChoose("voice")}
+          >
+            <span className="mode-title">Start Voice</span>
+            <span className="mode-description">
+              Talk naturally with the Coach using the V3 conversational voice.
+            </span>
+          </button>
+        </div>
+
+        <p className="test-note">
+          Dual-mode test build. For this first test, each session stays in the mode you choose.
+        </p>
+      </section>
+    </main>
+  );
+}
+
+function SessionApp({
+  mode,
   transcript,
   setTranscript,
   conversationId,
   setConversationId,
   sessionEnded,
   setSessionEnded,
-  sessionStarted,
-  setSessionStarted
+  onExitMode
 }) {
   const {
     startSession,
@@ -289,18 +316,19 @@ function CoachApp({
     sendUserMessage,
     sendUserActivity
   } = useConversationControls();
+
   const { status } = useConversationStatus();
   const { isMuted, setMuted } = useConversationInput();
   const { isSpeaking, isListening } = useConversationMode();
 
   const [error, setError] = useState("");
-  const [starting, setStarting] = useState(false);
-  const [creatingPdf, setCreatingPdf] = useState(false);
+  const [starting, setStarting] = useState(true);
   const [typedMessage, setTypedMessage] = useState("");
+  const [creatingPdf, setCreatingPdf] = useState(false);
+  const startedRef = useRef(false);
   const transcriptEndRef = useRef(null);
 
   const connected = status === "connected";
-  const connecting = status === "connecting" || starting;
   const canDownload = sessionEnded && transcript.length > 0;
 
   useEffect(() => {
@@ -310,54 +338,47 @@ function CoachApp({
     });
   }, [transcript]);
 
-  async function connectSession({ pendingText = "", reset = false } = {}) {
-    setError("");
-    setStarting(true);
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
 
-    if (reset) {
-      setTranscript([]);
-      setConversationId("");
-      setSessionEnded(false);
-    }
+    let cancelled = false;
 
-    setSessionStarted(true);
+    async function begin() {
+      setError("");
+      setStarting(true);
 
-    try {
-      // A full voice-capable ElevenLabs session requires microphone permission.
-      // Starting from the text box still uses the same voice + text conversation,
-      // so the user can switch to speaking at any time without starting over.
-      await navigator.mediaDevices.getUserMedia({ audio: true });
+      try {
+        if (mode === "voice") {
+          await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
 
-      const id = await startSession({
-        agentId: AGENT_ID
-      });
+        const id = await startSession({ agentId: AGENT_ID });
 
-      if (id) setConversationId(id);
+        if (!cancelled && id) {
+          setConversationId(id);
+        }
+      } catch (err) {
+        console.error(err);
 
-      if (pendingText.trim()) {
-        const text = pendingText.trim();
-
-        setTranscript((previous) =>
-          mergeTranscript(previous, { role: "user", text })
-        );
-
-        sendUserMessage(text);
-        setTypedMessage("");
+        if (!cancelled) {
+          setError(
+            mode === "voice"
+              ? "Microphone access is required for a voice session. Please allow microphone access and try again."
+              : "The text session could not connect. Please try again."
+          );
+        }
+      } finally {
+        if (!cancelled) setStarting(false);
       }
-    } catch (err) {
-      console.error(err);
-      setSessionStarted(false);
-      setError(
-        "To keep voice and text available in the same session, please allow microphone access. You can mute the microphone after connecting if you prefer to type."
-      );
-    } finally {
-      setStarting(false);
     }
-  }
 
-  async function handleStartVoice() {
-    await connectSession({ reset: transcript.length === 0 });
-  }
+    begin();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, startSession, setConversationId]);
 
   async function handleEnd() {
     setError("");
@@ -377,26 +398,13 @@ function CoachApp({
     }
   }
 
-  async function handleSend(event) {
+  function handleSend(event) {
     event.preventDefault();
-
     const text = typedMessage.trim();
-    if (!text || connecting || sessionEnded) return;
 
-    setError("");
-
-    if (!connected) {
-      await connectSession({
-        pendingText: text,
-        reset: transcript.length === 0
-      });
-      return;
-    }
+    if (!text || !connected) return;
 
     try {
-      // Add the typed message immediately so the interface feels responsive.
-      // If ElevenLabs echoes the same user message through onMessage,
-      // mergeTranscript will prevent a duplicate.
       setTranscript((previous) =>
         mergeTranscript(previous, { role: "user", text })
       );
@@ -417,11 +425,11 @@ function CoachApp({
   }
 
   async function handleDownload() {
-    setError("");
     setCreatingPdf(true);
+    setError("");
 
     try {
-      await createTranscriptPdf(transcript, conversationId);
+      await createTranscriptPdf(transcript, conversationId, mode);
     } catch (err) {
       console.error(err);
       setError("The PDF could not be created. Please try again.");
@@ -430,43 +438,44 @@ function CoachApp({
     }
   }
 
-  async function handleNewSession() {
-    setTypedMessage("");
-    setTranscript([]);
-    setConversationId("");
-    setSessionEnded(false);
-    setSessionStarted(false);
-    setError("");
+  let statusText =
+    mode === "text" ? "Connecting text session..." : "Connecting voice session...";
+
+  if (connected && mode === "text") statusText = "Text session connected";
+
+  if (connected && mode === "voice" && isSpeaking) {
+    statusText = "Coach is responding";
+  } else if (connected && mode === "voice" && isListening) {
+    statusText = "Listening";
+  } else if (connected && mode === "voice") {
+    statusText = "Voice session connected";
   }
 
-  let statusText = "Ready when you are";
-  if (connecting) statusText = "Connecting...";
-  if (connected && isSpeaking) statusText = "Coach is responding";
-  else if (connected && isListening) statusText = "Listening";
-  else if (connected) statusText = "Session connected";
-  else if (sessionEnded) statusText = "Session complete";
-
-  const displayedTranscript =
-    transcript.length > 0
-      ? transcript
-      : [{ role: "coach", text: WELCOME_MESSAGE, preview: true }];
+  if (sessionEnded) statusText = "Session complete";
 
   return (
     <main className="shell">
-      <section
-        className="coach-card"
-        aria-label="The Fitness Authority Coach session"
-      >
+      <section className="coach-card">
         <img
           src="/fac-logo.png"
           alt="The Fitness Authority Coach"
           className="fac-logo"
         />
 
-        <h1>Ready to work through something?</h1>
+        <div className="mode-pill">
+          {mode === "text" ? "Text Session" : "Voice Session"}
+        </div>
+
+        <h1>
+          {mode === "text"
+            ? "What are you working through?"
+            : "Ready to talk it through?"}
+        </h1>
+
         <p className="intro">
-          Talk or type. Switch between the two anytime during the same coaching
-          session and leave with a clear next step.
+          {mode === "text"
+            ? "Type your question below. This session is text-only, so no microphone is used."
+            : "Talk naturally with the Coach. You can also type during the voice session once connected."}
         </p>
 
         <div className={`status ${connected ? "live" : ""}`}>
@@ -474,39 +483,53 @@ function CoachApp({
           <span>{statusText}</span>
         </div>
 
+        <div className="conversation-panel" aria-live="polite">
+          <div className="conversation-list">
+            {transcript.length === 0 && !connected && (
+              <div className="empty-conversation">
+                Connecting to The Fitness Authority Coach...
+              </div>
+            )}
+
+            {transcript.length === 0 && connected && mode === "text" && (
+              <div className="empty-conversation">
+                Your text session is ready. Type your first message below.
+              </div>
+            )}
+
+            {transcript.map((entry, index) => (
+              <div
+                className={`message-row ${
+                  entry.role === "user" ? "user-row" : "coach-row"
+                }`}
+                key={`${entry.role}-${index}-${entry.text.slice(0, 24)}`}
+              >
+                <div
+                  className={`message-bubble ${
+                    entry.role === "user" ? "user-bubble" : "coach-bubble"
+                  }`}
+                >
+                  <span className="message-label">
+                    {entry.role === "user"
+                      ? "You"
+                      : "Fitness Authority Coach"}
+                  </span>
+                  <span className="message-text">{entry.text}</span>
+                </div>
+              </div>
+            ))}
+
+            <div ref={transcriptEndRef} />
+          </div>
+        </div>
+
         {!sessionEnded && (
           <>
-            <div className="conversation-panel" aria-live="polite">
-              <div className="conversation-list">
-                {displayedTranscript.map((entry, index) => (
-                  <div
-                    className={`message-row ${
-                      entry.role === "user" ? "user-row" : "coach-row"
-                    }`}
-                    key={`${entry.role}-${index}-${entry.text.slice(0, 24)}`}
-                  >
-                    <div
-                      className={`message-bubble ${
-                        entry.role === "user" ? "user-bubble" : "coach-bubble"
-                      } ${entry.preview ? "preview-bubble" : ""}`}
-                    >
-                      <span className="message-label">
-                        {entry.role === "user"
-                          ? "You"
-                          : "Fitness Authority Coach"}
-                      </span>
-                      <span className="message-text">{entry.text}</span>
-                    </div>
-                  </div>
-                ))}
-                <div ref={transcriptEndRef} />
-              </div>
-            </div>
-
             <form className="text-composer" onSubmit={handleSend}>
               <label className="composer-label" htmlFor="coach-message">
                 Type a message
               </label>
+
               <div className="composer-row">
                 <textarea
                   id="coach-message"
@@ -515,38 +538,25 @@ function CoachApp({
                   onKeyDown={handleKeyDown}
                   placeholder="Type or paste your message here..."
                   rows="3"
-                  disabled={connecting}
+                  disabled={!connected}
                 />
+
                 <button
                   className="send-button"
                   type="submit"
-                  disabled={!typedMessage.trim() || connecting}
+                  disabled={!connected || !typedMessage.trim()}
                 >
-                  {connecting ? "Connecting..." : "Send"}
+                  Send
                 </button>
               </div>
+
               <p className="composer-help">
-                Type and press Send, or use voice below. On your first use, your
-                browser may ask for microphone permission so you can switch
-                between voice and text anytime.
+                Press Enter to send. Use Shift + Enter for a new line.
               </p>
             </form>
 
-            <div className="voice-divider">
-              <span>Or talk it through</span>
-            </div>
-
-            {!connected ? (
-              <button
-                className="voice-start-button"
-                type="button"
-                onClick={handleStartVoice}
-                disabled={connecting}
-              >
-                {connecting ? "Connecting..." : "Start Voice"}
-              </button>
-            ) : (
-              <div className="controls">
+            <div className="controls">
+              {mode === "voice" && connected && (
                 <button
                   className="secondary-button"
                   type="button"
@@ -554,47 +564,41 @@ function CoachApp({
                 >
                   {isMuted ? "Unmute Microphone" : "Mute Microphone"}
                 </button>
+              )}
 
-                <button className="end-button" type="button" onClick={handleEnd}>
-                  End Session
-                </button>
-              </div>
-            )}
+              <button
+                className="end-button"
+                type="button"
+                onClick={handleEnd}
+                disabled={!connected}
+              >
+                End Session
+              </button>
+            </div>
           </>
         )}
 
         {sessionEnded && (
           <div className="session-complete">
-            {canDownload ? (
-              <>
-                <button
-                  className="download-button"
-                  type="button"
-                  onClick={handleDownload}
-                  disabled={creatingPdf}
-                >
-                  {creatingPdf
-                    ? "Creating PDF..."
-                    : "Download Conversation Transcript (PDF)"}
-                </button>
-
-                <p className="transcript-note">
-                  Keep this transcript for your notes or bring it to your next
-                  coaching call with Rick.
-                </p>
-              </>
-            ) : (
-              <p className="transcript-note">
-                No transcript was captured for this session.
-              </p>
+            {canDownload && (
+              <button
+                className="download-button"
+                type="button"
+                onClick={handleDownload}
+                disabled={creatingPdf}
+              >
+                {creatingPdf
+                  ? "Creating PDF..."
+                  : "Download Conversation Transcript (PDF)"}
+              </button>
             )}
 
             <button
               className="new-session-button"
               type="button"
-              onClick={handleNewSession}
+              onClick={onExitMode}
             >
-              Start New Session
+              Choose Another Session
             </button>
           </div>
         )}
@@ -606,43 +610,60 @@ function CoachApp({
 }
 
 function App() {
+  const [mode, setMode] = useState(null);
+  const [sessionKey, setSessionKey] = useState(0);
   const [transcript, setTranscript] = useState([]);
   const [conversationId, setConversationId] = useState("");
   const [sessionEnded, setSessionEnded] = useState(false);
-  const [sessionStarted, setSessionStarted] = useState(false);
 
   const handleMessage = useCallback((message) => {
     const cleaned = cleanMessage(message);
     if (!cleaned) return;
-
     setTranscript((previous) => mergeTranscript(previous, cleaned));
   }, []);
 
-  const handleDisconnect = useCallback(() => {
-    if (sessionStarted) {
-      setSessionEnded(true);
-    }
-  }, [sessionStarted]);
+  const handleChoose = useCallback((nextMode) => {
+    setTranscript([]);
+    setConversationId("");
+    setSessionEnded(false);
+    setMode(nextMode);
+    setSessionKey((value) => value + 1);
+  }, []);
+
+  const handleExitMode = useCallback(() => {
+    setTranscript([]);
+    setConversationId("");
+    setSessionEnded(false);
+    setMode(null);
+    setSessionKey((value) => value + 1);
+  }, []);
 
   const providerProps = useMemo(
     () => ({
       onMessage: handleMessage,
-      onDisconnect: handleDisconnect
+      textOnly: mode === "text"
     }),
-    [handleMessage, handleDisconnect]
+    [handleMessage, mode]
   );
 
+  if (!mode) {
+    return <ModeChooser onChoose={handleChoose} />;
+  }
+
   return (
-    <ConversationProvider {...providerProps}>
-      <CoachApp
+    <ConversationProvider
+      key={`${sessionKey}-${mode}`}
+      {...providerProps}
+    >
+      <SessionApp
+        mode={mode}
         transcript={transcript}
         setTranscript={setTranscript}
         conversationId={conversationId}
         setConversationId={setConversationId}
         sessionEnded={sessionEnded}
         setSessionEnded={setSessionEnded}
-        sessionStarted={sessionStarted}
-        setSessionStarted={setSessionStarted}
+        onExitMode={handleExitMode}
       />
     </ConversationProvider>
   );
