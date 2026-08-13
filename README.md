@@ -1,29 +1,24 @@
-# The Fitness Authority Coach — Text-First Greeting Fix
+# The Fitness Authority Coach — Text-First Greeting Fix v2
 
-This version fixes the text-first startup experience.
+This version fixes the text-first startup race condition.
 
 ## What changed
-- Voice-first sessions keep the normal spoken ElevenLabs First Message.
-- Text-first sessions suppress the spoken First Message for that session.
-- The user's typed message becomes the first real user turn, so the Coach responds directly to it.
+- Voice-first sessions still use the normal spoken ElevenLabs First Message.
+- Text-first sessions still suppress the spoken First Message.
+- The app now waits until the ElevenLabs SDK reports the conversation as **connected** before calling `sendUserMessage()`.
+- The typed message is then sent as the first real user turn, so the Coach should respond directly to it instead of waiting for microphone silence.
 - Voice and text remain available inside the same voice-capable session.
 - The existing instant-start interface, V3 agent, PDF transcript, mute controls, and session controls remain.
 
 ## REQUIRED ElevenLabs setting
-Before this build can suppress the greeting on text-first sessions:
+The live V3 Fitness Authority Coach agent must have:
 
-1. Open the live V3 Fitness Authority Coach agent in ElevenLabs.
-2. Go to **Security**.
-3. Find **Overrides**.
-4. Enable **First message**.
-5. Save/publish the agent.
-
-ElevenLabs disables overrides by default. If First message override is not enabled, the text-first suppression may fail.
+**Security → Overrides → First message = Enabled**
 
 ## Deployment
-Replace the matching files in the existing GitHub repository:
+Replace only these files in the existing GitHub repository:
 - `src/main.jsx`
 - `package.json`
 - `README.md`
 
-Vercel should redeploy automatically. The GHL iframe URL and height do not need to change.
+Vercel should redeploy automatically. The GHL iframe URL and 800px height do not need to change.
