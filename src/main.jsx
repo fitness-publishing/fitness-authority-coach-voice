@@ -281,10 +281,7 @@ function CoachApp({
   sessionEnded,
   setSessionEnded,
   sessionStarted,
-  setSessionStarted,
-  sessionLaunch,
-  requestSessionLaunch,
-  clearSessionLaunch
+  setSessionStarted
 }) {
   const {
     startSession,
@@ -313,91 +310,53 @@ function CoachApp({
     });
   }, [transcript]);
 
-  useEffect(() => {
-    if (!sessionLaunch || connected || connecting || sessionEnded) return;
+  async function connectSession({ pendingText = "", reset = false } = {}) {
+    setError("");
+    setStarting(true);
 
-    let cancelled = false;
-
-    async function launch() {
-      setError("");
-      setStarting(true);
-
-      const { mode, pendingText, reset } = sessionLaunch;
-
-      if (reset) {
-        setTranscript([]);
-        setConversationId("");
-        setSessionEnded(false);
-      }
-
-      setSessionStarted(true);
-
-      try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-
-        const id = await startSession({
-          agentId: AGENT_ID
-        });
-
-        if (cancelled) return;
-        if (id) setConversationId(id);
-
-        if (mode === "text" && pendingText?.trim()) {
-          const text = pendingText.trim();
-
-          setTranscript((previous) =>
-            mergeTranscript(previous, { role: "user", text })
-          );
-
-          window.setTimeout(() => {
-            try {
-              sendUserMessage(text);
-              setTypedMessage("");
-            } catch (err) {
-              console.error(err);
-              setError("Your message could not be sent. Please try again.");
-            }
-          }, 150);
-        }
-      } catch (err) {
-        console.error(err);
-        setSessionStarted(false);
-        setError(
-          "To keep voice and text available in the same session, please allow microphone access. You can mute the microphone after connecting if you prefer to type."
-        );
-      } finally {
-        if (!cancelled) {
-          setStarting(false);
-          clearSessionLaunch();
-        }
-      }
+    if (reset) {
+      setTranscript([]);
+      setConversationId("");
+      setSessionEnded(false);
     }
 
-    launch();
+    setSessionStarted(true);
 
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    sessionLaunch,
-    connected,
-    connecting,
-    sessionEnded,
-    startSession,
-    sendUserMessage,
-    setTranscript,
-    setConversationId,
-    setSessionEnded,
-    setSessionStarted,
-    clearSessionLaunch
-  ]);
+    try {
+      // A full voice-capable ElevenLabs session requires microphone permission.
+      // Starting from the text box still uses the same voice + text conversation,
+      // so the user can switch to speaking at any time without starting over.
+      await navigator.mediaDevices.getUserMedia({ audio: true });
 
-  function handleStartVoice() {
-    requestSessionLaunch({
-      mode: "voice",
-      pendingText: "",
-      reset: transcript.length === 0
-    });
+      const id = await startSession({
+        agentId: AGENT_ID
+      });
+
+      if (id) setConversationId(id);
+
+      if (pendingText.trim()) {
+        const text = pendingText.trim();
+
+        setTranscript((previous) =>
+          mergeTranscript(previous, { role: "user", text })
+        );
+
+        sendUserMessage(text);
+        setTypedMessage("");
+      }
+    } catch (err) {
+      console.error(err);
+      setSessionStarted(false);
+      setError(
+        "To keep voice and text available in the same session, please allow microphone access. You can mute the microphone after connecting if you prefer to type."
+      );
+    } finally {
+      setStarting(false);
+    }
+  }
+
+  async function handleStartVoice() {
+    await connectSession({ reset: transcript.length === 0 });
   }
 
   async function handleEnd() {
@@ -427,8 +386,7 @@ function CoachApp({
     setError("");
 
     if (!connected) {
-      requestSessionLaunch({
-        mode: "text",
+      await connectSession({
         pendingText: text,
         reset: transcript.length === 0
       });
@@ -652,9 +610,6 @@ function App() {
   const [conversationId, setConversationId] = useState("");
   const [sessionEnded, setSessionEnded] = useState(false);
   const [sessionStarted, setSessionStarted] = useState(false);
-  const [sessionLaunch, setSessionLaunch] = useState(null);
-  const [launchMode, setLaunchMode] = useState("voice");
-  const [providerVersion, setProviderVersion] = useState(0);
 
   const handleMessage = useCallback((message) => {
     const cleaned = cleanMessage(message);
@@ -669,38 +624,16 @@ function App() {
     }
   }, [sessionStarted]);
 
-  const requestSessionLaunch = useCallback((launch) => {
-    setLaunchMode(launch.mode);
-    setProviderVersion((value) => value + 1);
-
-    window.setTimeout(() => {
-      setSessionLaunch(launch);
-    }, 0);
-  }, []);
-
-  const clearSessionLaunch = useCallback(() => {
-    setSessionLaunch(null);
-  }, []);
-
-  const providerProps = useMemo(() => {
-    const props = {
+  const providerProps = useMemo(
+    () => ({
       onMessage: handleMessage,
       onDisconnect: handleDisconnect
-    };
-
-    if (launchMode === "text") {
-      props.overrides = {
-        agent: {
-          firstMessage: ""
-        }
-      };
-    }
-
-    return props;
-  }, [handleMessage, handleDisconnect, launchMode]);
+    }),
+    [handleMessage, handleDisconnect]
+  );
 
   return (
-    <ConversationProvider key={providerVersion} {...providerProps}>
+    <ConversationProvider {...providerProps}>
       <CoachApp
         transcript={transcript}
         setTranscript={setTranscript}
@@ -710,9 +643,6 @@ function App() {
         setSessionEnded={setSessionEnded}
         sessionStarted={sessionStarted}
         setSessionStarted={setSessionStarted}
-        sessionLaunch={sessionLaunch}
-        requestSessionLaunch={requestSessionLaunch}
-        clearSessionLaunch={clearSessionLaunch}
       />
     </ConversationProvider>
   );
