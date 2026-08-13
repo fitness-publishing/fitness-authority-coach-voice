@@ -525,10 +525,9 @@ function CoachApp({
                   {connecting ? "Connecting..." : "Send"}
                 </button>
               </div>
-              <p className="composer-help">
-                Type and press Send, or use voice below. On your first use, your
-                browser may ask for microphone permission so you can switch
-                between voice and text anytime.
+              <p className="startup-instruction">
+                <strong>Start by speaking.</strong> Once connected, you can talk,
+                type, paste content, or use any combination of the three.
               </p>
             </form>
 
@@ -543,7 +542,7 @@ function CoachApp({
                 onClick={handleStartVoice}
                 disabled={connecting}
               >
-                {connecting ? "Connecting..." : "Start Coaching Session"}
+                {Start Coaching Session? "Connecting..." : "Start Coaching Session"}
               </button>
             ) : (
               <div className="controls">

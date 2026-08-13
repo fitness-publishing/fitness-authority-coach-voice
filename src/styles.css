@@ -394,9 +394,13 @@ h1 {
 
 
 .startup-instruction {
-  margin-top: 10px;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-left: 4px solid #C28E27;
+  background: #fff8ea;
+  border-radius: 6px;
   font-size: 0.98rem;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.45;
   color: #0b1b2b;
 }
