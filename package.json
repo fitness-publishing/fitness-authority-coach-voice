@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@elevenlabs/react": "1.11.0",
+    "@elevenlabs/react": "^1.15.0",
     "@vitejs/plugin-react": "^5.0.0",
     "jspdf": "4.2.1",
     "vite": "^7.0.0",
