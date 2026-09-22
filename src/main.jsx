@@ -329,8 +329,9 @@ function CoachApp({
       await navigator.mediaDevices.getUserMedia({ audio: true });
 
       const id = await startSession({
-        agentId: AGENT_ID
-      });
+  agentId: AGENT_ID,
+  connectionType: "webrtc"
+});
 
       if (id) setConversationId(id);
 
