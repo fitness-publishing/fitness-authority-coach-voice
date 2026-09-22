@@ -221,7 +221,9 @@ async function createTranscriptPdf(entries, conversationId) {
 
     y += 15;
 
-    addWrappedText(entry.text, {
+    addWrappedText(
+  entry.text.replace(/\[[^\]]+\]/g, "").replace(/\s{2,}/g, " ").trim(),
+  {
       fontSize: 10.5,
       fontStyle: "normal",
       color: navy,
