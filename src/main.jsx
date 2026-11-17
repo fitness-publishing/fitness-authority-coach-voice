@@ -442,12 +442,25 @@ function CoachApp({
     setError("");
   }
 
-  let statusText = "Ready when you are";
-  if (connecting) statusText = "Connecting...";
-  if (connected && isSpeaking) statusText = "Coach is responding";
-  else if (connected && isListening) statusText = "Listening";
-  else if (connected) statusText = "Session connected";
-  else if (sessionEnded) statusText = "Session complete";
+  let statusText = "READY";
+  let statusState = "ready";
+
+  if (connecting) {
+    statusText = "CONNECTING";
+    statusState = "connecting";
+  } else if (connected && isSpeaking) {
+    statusText = "COACH RESPONDING";
+    statusState = "responding";
+  } else if (connected && isListening) {
+    statusText = "LISTENING";
+    statusState = "listening";
+  } else if (connected) {
+    statusText = "SESSION ACTIVE";
+    statusState = "active";
+  } else if (sessionEnded) {
+    statusText = "SESSION COMPLETE";
+    statusState = "complete";
+  }
 
   const displayedTranscript =
     transcript.length > 0
@@ -472,7 +485,7 @@ function CoachApp({
           session and leave with a clear next step.
         </p>
 
-        <div className={`status ${connected ? "live" : ""}`}>
+        <div className={`status status-${statusState}`}>
           <span className="status-dot" aria-hidden="true"></span>
           <span>{statusText}</span>
         </div>
