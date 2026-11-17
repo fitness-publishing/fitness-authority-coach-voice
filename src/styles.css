@@ -65,28 +65,57 @@ h1 {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-height: 34px;
+  min-height: 32px;
   margin-bottom: 16px;
-  padding: 7px 12px;
-  border: 1px solid #e5e7eb;
+  padding: 6px 11px;
+  border: 1px solid #dbe1e7;
   border-radius: 999px;
-  background: #f8fafc;
-  color: #4b5563;
-  font-size: 0.88rem;
-  font-weight: 700;
+  background: #ffffff;
+  color: #536170;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
 }
 
 .status-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #d5a64a;
-  box-shadow: 0 0 0 4px rgba(213, 166, 74, 0.12);
+  background: #94a3b8;
+  box-shadow: 0 0 0 4px rgba(148, 163, 184, 0.12);
 }
 
-.status.live .status-dot {
+.status-ready .status-dot {
+  background: #d5a64a;
+  box-shadow: 0 0 0 4px rgba(213, 166, 74, 0.14);
+}
+
+.status-connecting .status-dot {
   background: #d5a64a;
   box-shadow: 0 0 0 4px rgba(213, 166, 74, 0.18);
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+
+.status-listening .status-dot,
+.status-active .status-dot {
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.14);
+}
+
+.status-responding .status-dot {
+  background: #d5a64a;
+  box-shadow: 0 0 0 4px rgba(213, 166, 74, 0.18);
+  animation: status-pulse 1.2s ease-in-out infinite;
+}
+
+.status-complete .status-dot {
+  background: #64748b;
+  box-shadow: 0 0 0 4px rgba(100, 116, 139, 0.12);
+}
+
+@keyframes status-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.15); opacity: 0.65; }
 }
 
 .conversation-panel {
