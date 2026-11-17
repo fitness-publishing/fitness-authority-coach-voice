@@ -529,8 +529,8 @@ function CoachApp({
                 </button>
               </div>
               <p className="startup-instruction">
-                <strong>Start by speaking.</strong> Once connected, you can talk,
-                type, paste content, or use any combination of the three.
+                <strong>Click "Start Coaching Session."</strong> Once connected,
+                you can talk, type, paste content, or use any combination of the three.
               </p>
             </form>
 
